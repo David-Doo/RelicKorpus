@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>The Gesellschaft Project</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="hero">
+      <h1>The Gesellschaft Project</h1>
+      <p>A controlled archival and management system designed to protect accuracy while preserving structured freedom.</p>
+
+      <div id="authBlock" class="auth"></div>
+      <div id="sessionBlock" class="session-strip hidden">
+        <span id="activeIdentity"></span>
+        <span id="activeRole" class="badge"></span>
+        <button id="logoutBtn" class="ghost">Log Out</button>
+      </div>
+
+      <button id="menuToggleBtn" class="ghost" type="button">Open Navigation Menu</button>
+    </header>
+
+    <nav id="tabDropdown" class="tabs hidden" aria-label="Primary navigation">
+      <button class="tab active" data-tab="home">Home</button>
+      <button class="tab" data-tab="files">Files</button>
+      <button class="tab" data-tab="search">Search Files</button>
+      <button class="tab" data-tab="rules">Rules</button>
+      <button class="tab" data-tab="chat">Chats</button>
+      <button class="tab" data-tab="identity">Player Identification</button>
+      <button class="tab" data-tab="tasks">Scheduled Tasks</button>
+      <button class="tab hidden" data-tab="admin">Admin Menu</button>
+    </nav>
+
+    <main>
+      <section id="home" class="panel active">
+        <h2>Institution Charter</h2>
+        <p><strong>Gesellschaft</strong> is a German word that describes an organized society built on formal rules, roles, and institutions.</p>
+        <p>The purpose of this system is to preserve reliable knowledge through structured review: controlled access, tracked edits, role-based accountability, and administrative oversight.</p>
+        <p>The Gesellschaft hierarchy is: <strong>User &gt; Enforcer &gt; Admin &gt; Core</strong>. Accounts are created by Admin or Core only.</p>
+      </section>
+
+      <section id="files" class="panel">
+        <div class="grid">
+          <article>
+            <h2>Create / Amend File</h2>
+            <form id="fileForm">
+              <input type="hidden" id="fileId" />
+              <label>Name <input id="fileName" required /></label>
+              <label>Tags (comma-separated) <input id="fileTags" required /></label>
+              <label>Summary <textarea id="fileSummary" required></textarea></label>
+              <label>Content <textarea id="fileContent" required></textarea></label>
+              <label>Attachments (URLs, comma-separated) <input id="fileAttachments" /></label>
+              <label>Visibility
+                <select id="fileVisibility">
+                  <option value="public">Public</option>
+                  <option value="restricted">Restricted</option>
+                </select>
+              </label>
+              <div class="actions">
+                <button type="submit">Save File</button>
+                <button type="button" id="clearFileForm" class="ghost">Clear</button>
+              </div>
+            </form>
+          </article>
+
+          <article>
+            <h2>Archive Index</h2>
+            <div id="fileList" class="list"></div>
+          </article>
+        </div>
+
+        <div class="grid">
+          <article>
+            <h3>Permission Requests</h3>
+            <div id="permissionRequests" class="list"></div>
+          </article>
+          <article>
+            <h3>Edit Locks (Enforcer Requests)</h3>
+            <div id="lockRequests" class="list"></div>
+          </article>
+          <article>
+            <h3>Enforcer Edit Audit (Admin/Core)</h3>
+            <div id="enforcerAudit" class="list"></div>
+          </article>
+        </div>
+      </section>
+
+      <section id="search" class="panel">
+        <h2>Search Files</h2>
+        <input id="searchInput" placeholder="Search by name, tag, or summary..." />
+        <div id="searchResults" class="list"></div>
+      </section>
+
+      <section id="rules" class="panel">
+        <div class="grid">
+          <article>
+            <h2>Gesellschaft Rules</h2>
+            <div id="rulesList" class="list"></div>
+          </article>
+          <article>
+            <h2>Rule Requests (Admin → Core)</h2>
+            <form id="ruleRequestForm">
+              <label>Rule Title <input id="ruleRequestTitle" required /></label>
+              <label>Proposed Rule <textarea id="ruleRequestContent" required></textarea></label>
+              <button type="submit">Submit Request</button>
+            </form>
+
+            <h3>Core Direct Rule Entry</h3>
+            <form id="coreRuleForm">
+              <label>Rule Title <input id="coreRuleTitle" /></label>
+              <label>Rule Content <textarea id="coreRuleContent"></textarea></label>
+              <button type="submit">Add Rule (Core)</button>
+            </form>
+
+            <div id="ruleRequestList" class="list"></div>
+          </article>
+        </div>
+      </section>
+
+      <section id="chat" class="panel">
+        <div class="grid">
+          <article>
+            <h2>Create Chat</h2>
+            <form id="chatCreateForm">
+              <label>Chat Name <input id="chatName" required /></label>
+              <button type="submit">Create Chat</button>
+            </form>
+
+            <h3>Invite User by Chat ID</h3>
+            <form id="chatInviteForm">
+              <label>Chat ID <input id="inviteChatId" required /></label>
+              <label>User ID <input id="inviteUserId" type="number" min="1" required /></label>
+              <button type="submit">Send Invite</button>
+            </form>
+          </article>
+          <article>
+            <h2>Active Chats</h2>
+            <div id="chatList" class="list"></div>
+          </article>
+        </div>
+      </section>
+
+      <section id="identity" class="panel">
+        <div class="grid">
+          <article>
+            <h2>Player Identification</h2>
+            <div id="identityCard"></div>
+          </article>
+          <article>
+            <h2>Request Name / Rank Change</h2>
+            <form id="identityRequestForm">
+              <label>Requested Name <input id="requestedName" required /></label>
+              <label>Requested Rank
+                <select id="requestedRank">
+                  <option>User</option>
+                  <option>Enforcer</option>
+                  <option>Admin</option>
+                </select>
+              </label>
+              <button type="submit">Submit Request</button>
+            </form>
+
+            <h3>Change Your Password</h3>
+            <form id="passwordChangeForm">
+              <label>Current Password <input id="currentPassword" type="password" required /></label>
+              <label>New Password <input id="newPassword" type="password" required /></label>
+              <button type="submit">Update Password</button>
+            </form>
+            <div id="passwordStatus" class="meta"></div>
+
+            <div id="identityRequests" class="list"></div>
+          </article>
+        </div>
+      </section>
+
+      <section id="tasks" class="panel">
+        <div class="grid">
+          <article>
+            <h2>Task Assignment</h2>
+            <form id="taskForm">
+              <label>Task Title <input id="taskTitle" required /></label>
+              <label>Description <textarea id="taskDescription" required></textarea></label>
+              <label>Assign To Rank
+                <select id="taskRank">
+                  <option>User</option>
+                  <option>Enforcer</option>
+                </select>
+              </label>
+              <button type="submit">Create Task</button>
+            </form>
+          </article>
+          <article>
+            <h2>Task Board</h2>
+            <div id="taskList" class="list"></div>
+          </article>
+        </div>
+      </section>
+
+      <section id="admin" class="panel">
+        <div class="grid">
+          <article>
+            <h2>User Management (Admin/Core)</h2>
+            <form id="adminCreateUserForm">
+              <label>Username <input id="adminUserName" placeholder="Adjective & Adjective Rank" required /></label>
+              <label>Rank
+                <select id="adminUserRank">
+                  <option>User</option>
+                  <option>Enforcer</option>
+                  <option>Admin</option>
+                </select>
+              </label>
+              <label>Password <input id="adminUserPassword" type="password" required /></label>
+              <button type="submit">Create User</button>
+            </form>
+            <div id="adminUserList" class="list"></div>
+          </article>
+          <article>
+            <h2>File Management (Admin/Core)</h2>
+            <div id="adminFileList" class="list"></div>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
