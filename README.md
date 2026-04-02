@@ -14,6 +14,7 @@ A lightweight browser-based archival and management system implementing the Gese
   - Enforcer edits are recorded in a dedicated Admin/Core audit view.
 - **Moderation flow:** Enforcers can submit lock requests to suspend a User's editing privileges for up to 7 days (requires Admin/Core approval).
 - **Administrative coordination:** Scheduled tasks can be created by Admin/Core and completed by Enforcer/User accounts.
+- **Rules governance:** Admins can submit rule requests that require Core approval; Core can also add rules directly.
 - **Admin Menu permissions:**
   - **Core:** can create User/Enforcer/Admin accounts and delete users/files.
   - **Admin:** can create User accounts, promote Users to Enforcer, and delete users/files (except protected Admin/Core restrictions).

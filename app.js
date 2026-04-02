@@ -24,6 +24,16 @@ const initialState = {
   lockRequests: [],
   identityRequests: [],
   tasks: [],
+  rules: [
+    {
+      id: crypto.randomUUID(),
+      title: "Verification First",
+      content: "Every major claim added to a file must be backed by verifiable evidence.",
+      createdBy: 1,
+      createdAt: new Date().toISOString(),
+    },
+  ],
+  ruleRequests: [],
 };
 
 let state = loadState();
@@ -430,6 +440,128 @@ function renderIdentity() {
   }).join("") || '<p class="notice">No identity requests.</p>';
 }
 
+function setupRules() {
+  $("#ruleRequestForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const user = guardLoggedIn();
+    if (!user || user.rank !== "Admin") return;
+
+    state.ruleRequests.push({
+      id: crypto.randomUUID(),
+      title: $("#ruleRequestTitle").value.trim(),
+      content: $("#ruleRequestContent").value.trim(),
+      requestedBy: user.id,
+      status: "pending",
+      requestedAt: new Date().toISOString(),
+    });
+
+    saveState();
+    e.target.reset();
+    renderAll();
+  });
+
+  $("#coreRuleForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const user = guardLoggedIn();
+    if (!user || user.rank !== "Core") return;
+
+    const title = $("#coreRuleTitle").value.trim();
+    const content = $("#coreRuleContent").value.trim();
+    if (!title || !content) return;
+
+    state.rules.push({
+      id: crypto.randomUUID(),
+      title,
+      content,
+      createdBy: user.id,
+      createdAt: new Date().toISOString(),
+    });
+
+    saveState();
+    e.target.reset();
+    renderAll();
+  });
+}
+
+window.decideRuleRequest = (id, status) => {
+  const user = guardLoggedIn();
+  if (!user || user.rank !== "Core") return;
+  const request = state.ruleRequests.find((r) => r.id === id);
+  if (!request || request.status !== "pending") return;
+
+  request.status = status;
+  request.decidedBy = user.id;
+  request.decidedAt = new Date().toISOString();
+
+  if (status === "approved") {
+    state.rules.push({
+      id: crypto.randomUUID(),
+      title: request.title,
+      content: request.content,
+      createdBy: request.requestedBy,
+      createdAt: new Date().toISOString(),
+      sourceRequestId: request.id,
+    });
+  }
+
+  saveState();
+  renderAll();
+};
+
+function renderRules() {
+  const user = activeUser();
+  const rulesList = $("#rulesList");
+  const requestsList = $("#ruleRequestList");
+  const requestForm = $("#ruleRequestForm");
+  const coreForm = $("#coreRuleForm");
+
+  if (!state.rules.length) {
+    rulesList.innerHTML = '<p class="notice">No rules published yet.</p>';
+  } else {
+    rulesList.innerHTML = state.rules
+      .map((rule) => {
+        const author = state.users.find((u) => u.id === rule.createdBy);
+        return `<div class="item">
+          <h4>${rule.title}</h4>
+          <p>${rule.content}</p>
+          <p class="meta">Added by ${author?.username || `#${rule.createdBy}`}</p>
+        </div>`;
+      })
+      .join("");
+  }
+
+  if (!user) {
+    requestForm.style.display = "none";
+    coreForm.style.display = "none";
+    requestsList.innerHTML = '<p class="notice">Login required to submit or review requests.</p>';
+    return;
+  }
+
+  requestForm.style.display = user.rank === "Admin" ? "grid" : "none";
+  coreForm.style.display = user.rank === "Core" ? "grid" : "none";
+
+  if (!["Admin", "Core"].includes(user.rank)) {
+    requestsList.innerHTML = '<p class="notice">Rule request activity is visible to Admin/Core only.</p>';
+    return;
+  }
+
+  requestsList.innerHTML = state.ruleRequests
+    .map((request) => {
+      const requester = state.users.find((u) => u.id === request.requestedBy);
+      return `<div class="item">
+        <h4>${request.title}</h4>
+        <p>${request.content}</p>
+        <p class="meta">Requested by ${requester?.username || `#${request.requestedBy}`} • ${request.status}</p>
+        ${
+          user.rank === "Core" && request.status === "pending"
+            ? `<button onclick="decideRuleRequest('${request.id}','approved')">Approve</button> <button class="ghost" onclick="decideRuleRequest('${request.id}','denied')">Deny</button>`
+            : ""
+        }
+      </div>`;
+    })
+    .join("") || '<p class="notice">No rule requests.</p>';
+}
+
 function setupTasks() {
   $("#taskForm").addEventListener("submit", (e) => {
     e.preventDefault();
@@ -570,6 +702,7 @@ function renderAll() {
   renderPermissionRequests();
   renderLockRequests();
   renderEnforcerAudit();
+  renderRules();
   renderIdentity();
   renderTasks();
   renderAdminMenu();
@@ -580,6 +713,7 @@ function bootstrap() {
   setupFileForm();
   setupEnforcerLocks();
   setupSearch();
+  setupRules();
   setupIdentity();
   setupTasks();
   setupAdminMenu();

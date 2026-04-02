@@ -23,6 +23,7 @@
       <button class="tab active" data-tab="home">Home</button>
       <button class="tab" data-tab="files">Files</button>
       <button class="tab" data-tab="search">Search Files</button>
+      <button class="tab" data-tab="rules">Rules</button>
       <button class="tab" data-tab="identity">Player Identification</button>
       <button class="tab" data-tab="tasks">Scheduled Tasks</button>
       <button class="tab hidden" data-tab="admin">Admin Menu</button>
@@ -84,6 +85,32 @@
         <h2>Search Files</h2>
         <input id="searchInput" placeholder="Search by name, tag, or summary..." />
         <div id="searchResults" class="list"></div>
+      </section>
+
+      <section id="rules" class="panel">
+        <div class="grid">
+          <article>
+            <h2>Gesellschaft Rules</h2>
+            <div id="rulesList" class="list"></div>
+          </article>
+          <article>
+            <h2>Rule Requests (Admin → Core)</h2>
+            <form id="ruleRequestForm">
+              <label>Rule Title <input id="ruleRequestTitle" required /></label>
+              <label>Proposed Rule <textarea id="ruleRequestContent" required></textarea></label>
+              <button type="submit">Submit Request</button>
+            </form>
+
+            <h3>Core Direct Rule Entry</h3>
+            <form id="coreRuleForm">
+              <label>Rule Title <input id="coreRuleTitle" /></label>
+              <label>Rule Content <textarea id="coreRuleContent"></textarea></label>
+              <button type="submit">Add Rule (Core)</button>
+            </form>
+
+            <div id="ruleRequestList" class="list"></div>
+          </article>
+        </div>
       </section>
 
       <section id="identity" class="panel">
