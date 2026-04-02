@@ -62,13 +62,18 @@ function rankAtMost(current, limit) {
 
 function setupTabs() {
   document.querySelectorAll(".tab").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
-      document.querySelectorAll(".panel").forEach((p) => p.classList.remove("active"));
-      btn.classList.add("active");
-      document.getElementById(btn.dataset.tab).classList.add("active");
-    });
+    btn.addEventListener("click", () => activateTab(btn.dataset.tab));
   });
+}
+
+function activateTab(tabName) {
+  const targetTab = document.querySelector(`.tab[data-tab="${tabName}"]`);
+  const targetPanel = document.getElementById(tabName);
+  if (!targetTab || !targetPanel || targetTab.classList.contains("hidden")) return;
+  document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
+  document.querySelectorAll(".panel").forEach((p) => p.classList.remove("active"));
+  targetTab.classList.add("active");
+  targetPanel.classList.add("active");
 }
 
 function renderAuth() {
@@ -114,6 +119,18 @@ function renderAuth() {
   };
 }
 
+function renderHomeQuickNav() {
+  const host = $("#homeQuickNav");
+  if (!host) return;
+  const visibleTabs = [...document.querySelectorAll(".tab:not(.hidden)")];
+  host.innerHTML = visibleTabs
+    .map((tab) => `<button class="portal-btn" type="button" data-target-tab="${tab.dataset.tab}">${tab.textContent}</button>`)
+    .join("");
+  host.querySelectorAll(".portal-btn").forEach((button) => {
+    button.addEventListener("click", () => activateTab(button.dataset.targetTab));
+  });
+}
+
 function guardLoggedIn() {
   const user = activeUser();
   if (!user) {
@@ -126,6 +143,13 @@ function guardLoggedIn() {
 function renderFiles() {
   const user = activeUser();
   const list = $("#fileList");
+  const canSeeLockTools = !!user && (user.rank === "Enforcer" || isAdminOrCore(user));
+  $("#filesCreateCard").classList.toggle("hidden", !user);
+  $("#permissionRequestsCard").classList.toggle("hidden", !isAdminOrCore(user));
+  $("#enforcerAuditCard").classList.toggle("hidden", !isAdminOrCore(user));
+  $("#lockRequestsCard").classList.toggle("hidden", !canSeeLockTools);
+  const lockRequestFormBlock = $("#lockRequestFormBlock");
+  if (lockRequestFormBlock) lockRequestFormBlock.classList.toggle("hidden", !user || user.rank !== "Enforcer");
   if (!user) {
     list.innerHTML = `<p class="notice">Login required.</p>`;
     return;
@@ -266,6 +290,7 @@ window.decidePermission = (id, status) => {
 function setupEnforcerLocks() {
   const fileFormArticle = document.querySelector("#files article");
   const block = document.createElement("div");
+  block.id = "lockRequestFormBlock";
   block.innerHTML = `
     <h3>Submit Edit Lock Request (Enforcer)</h3>
     <form id="lockRequestForm">
@@ -300,6 +325,10 @@ function setupEnforcerLocks() {
 function renderLockRequests() {
   const user = activeUser();
   const list = $("#lockRequests");
+  if (!user || !(user.rank === "Enforcer" || isAdminOrCore(user))) {
+    list.innerHTML = '<p class="notice">Visible to Enforcer/Admin/Core only.</p>';
+    return;
+  }
   if (!state.lockRequests.length) {
     list.innerHTML = '<p class="notice">No lock requests.</p>';
     return;
@@ -424,7 +453,8 @@ function renderIdentity() {
   }
 
   card.innerHTML = `<div class="item"><h4>${user.username}</h4><p>Name: ${user.username}</p><p>ID: ${user.id}</p><p>Rank: ${user.rank}</p></div>`;
-  list.innerHTML = state.identityRequests.map((r) => {
+  const visibleRequests = isAdminOrCore(user) ? state.identityRequests : state.identityRequests.filter((r) => r.userId === user.id);
+  list.innerHTML = visibleRequests.map((r) => {
     const requester = state.users.find((u) => u.id === r.userId);
     return `<div class="item"><p>#${r.userId} ${requester?.username || "Unknown"} requested <strong>${r.newName}</strong> / ${r.newRank}</p><p class="meta">Status: ${r.status}</p>${canApprove(user) && r.status === "pending" ? `<button onclick="decideIdentity('${r.id}','approved')">Approve</button> <button onclick="decideIdentity('${r.id}','denied')">Deny</button>` : ""}</div>`;
   }).join("") || '<p class="notice">No identity requests.</p>';
@@ -464,7 +494,7 @@ window.completeTask = (id) => {
 function renderTasks() {
   const user = activeUser();
   const board = $("#taskList");
-  const formCard = $("#taskForm").closest("article");
+  const formCard = $("#taskAssignCard");
   if (!user) {
     board.innerHTML = '<p class="notice">Login required.</p>';
     formCard.style.display = "none";
@@ -564,8 +594,75 @@ function renderAdminMenu() {
     .join("") || '<p class="notice">No files available.</p>';
 }
 
+function setupNodeBackground() {
+  const canvas = document.getElementById("nodeBackground");
+  if (!canvas) return;
+  const context = canvas.getContext("2d");
+  if (!context) return;
+
+  const nodes = [];
+  const nodeCount = 42;
+  const maxSpeed = 0.35;
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    if (nodes.length) return;
+    for (let i = 0; i < nodeCount; i += 1) {
+      nodes.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        vx: (Math.random() * 2 - 1) * maxSpeed,
+        vy: (Math.random() * 2 - 1) * maxSpeed,
+      });
+    }
+  }
+
+  function frame() {
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    for (const node of nodes) {
+      node.x += node.vx;
+      node.y += node.vy;
+      if (node.x < 0 || node.x > canvas.width) node.vx *= -1;
+      if (node.y < 0 || node.y > canvas.height) node.vy *= -1;
+    }
+
+    for (let i = 0; i < nodes.length; i += 1) {
+      for (let j = i + 1; j < nodes.length; j += 1) {
+        const a = nodes[i];
+        const b = nodes[j];
+        const dx = a.x - b.x;
+        const dy = a.y - b.y;
+        const distance = Math.hypot(dx, dy);
+        if (distance < 170) {
+          const alpha = 1 - distance / 170;
+          context.strokeStyle = `rgba(121, 183, 255, ${alpha * 0.32})`;
+          context.lineWidth = 1 + alpha * 2;
+          context.beginPath();
+          context.moveTo(a.x, a.y);
+          context.quadraticCurveTo((a.x + b.x) / 2, (a.y + b.y) / 2 + 10, b.x, b.y);
+          context.stroke();
+        }
+      }
+    }
+
+    for (const node of nodes) {
+      context.fillStyle = "rgba(139, 205, 255, 0.85)";
+      context.beginPath();
+      context.arc(node.x, node.y, 2.4, 0, Math.PI * 2);
+      context.fill();
+    }
+    requestAnimationFrame(frame);
+  }
+
+  resize();
+  window.addEventListener("resize", resize);
+  frame();
+}
+
 function renderAll() {
   renderAuth();
+  renderHomeQuickNav();
   renderFiles();
   renderPermissionRequests();
   renderLockRequests();
@@ -576,6 +673,7 @@ function renderAll() {
 }
 
 function bootstrap() {
+  setupNodeBackground();
   setupTabs();
   setupFileForm();
   setupEnforcerLocks();
