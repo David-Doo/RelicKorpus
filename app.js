@@ -100,7 +100,22 @@ function setupTabs() {
       document.querySelectorAll(".panel").forEach((p) => p.classList.remove("active"));
       btn.classList.add("active");
       document.getElementById(btn.dataset.tab).classList.add("active");
+      $("#tabDropdown")?.classList.add("hidden");
+      const toggleBtn = $("#menuToggleBtn");
+      if (toggleBtn) toggleBtn.textContent = "Open Navigation Menu";
     });
+  });
+}
+
+function setupMenuToggle() {
+  const toggleBtn = $("#menuToggleBtn");
+  const tabDropdown = $("#tabDropdown");
+  if (!toggleBtn || !tabDropdown) return;
+  toggleBtn.addEventListener("click", () => {
+    tabDropdown.classList.toggle("hidden");
+    toggleBtn.textContent = tabDropdown.classList.contains("hidden")
+      ? "Open Navigation Menu"
+      : "Close Navigation Menu";
   });
 }
 
@@ -840,6 +855,7 @@ function renderAll() {
 }
 
 function bootstrap() {
+  setupMenuToggle();
   setupTabs();
   setupFileForm();
   setupEnforcerLocks();

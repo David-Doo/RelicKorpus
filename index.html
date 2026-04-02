@@ -17,9 +17,11 @@
         <span id="activeRole" class="badge"></span>
         <button id="logoutBtn" class="ghost">Log Out</button>
       </div>
+
+      <button id="menuToggleBtn" class="ghost" type="button">Open Navigation Menu</button>
     </header>
 
-    <nav class="tabs" aria-label="Primary navigation">
+    <nav id="tabDropdown" class="tabs hidden" aria-label="Primary navigation">
       <button class="tab active" data-tab="home">Home</button>
       <button class="tab" data-tab="files">Files</button>
       <button class="tab" data-tab="search">Search Files</button>
@@ -33,6 +35,8 @@
     <main>
       <section id="home" class="panel active">
         <h2>Institution Charter</h2>
+        <p><strong>Gesellschaft</strong> is a German word that describes an organized society built on formal rules, roles, and institutions.</p>
+        <p>The purpose of this system is to preserve reliable knowledge through structured review: controlled access, tracked edits, role-based accountability, and administrative oversight.</p>
         <p>The Gesellschaft hierarchy is: <strong>User &gt; Enforcer &gt; Admin &gt; Core</strong>. Accounts are created by Admin or Core only.</p>
       </section>
 
