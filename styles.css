@@ -1,0 +1,181 @@
+:root {
+  --bg: #0f1020;
+  --panel: #171935;
+  --card: #1f2247;
+  --text: #eef1ff;
+  --muted: #a8b0d9;
+  --accent: #6ea8fe;
+  --danger: #ff7f9f;
+  --ok: #76d6aa;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Inter, system-ui, sans-serif;
+  background: linear-gradient(180deg, #0a0b17, #101333);
+  color: var(--text);
+}
+
+.hero {
+  padding: 1.25rem;
+  background: var(--panel);
+  border-bottom: 1px solid #303467;
+}
+
+.hero h1 {
+  margin: 0;
+}
+
+.hero p {
+  color: var(--muted);
+  margin: 0.5rem 0 1rem;
+}
+
+.session-strip {
+  display: flex;
+  gap: 0.65rem;
+  align-items: center;
+}
+
+.badge {
+  background: #2d336d;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #303467;
+}
+
+.tab {
+  background: transparent;
+  border: 1px solid #3d447f;
+  color: var(--text);
+  padding: 0.45rem 0.8rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.tab.active {
+  background: var(--accent);
+  color: #08102c;
+}
+
+main {
+  padding: 1rem;
+}
+
+.panel {
+  display: none;
+}
+
+.panel.active {
+  display: block;
+}
+
+.grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  margin-bottom: 1rem;
+}
+
+article {
+  background: var(--card);
+  border: 1px solid #353b77;
+  border-radius: 10px;
+  padding: 1rem;
+}
+
+form {
+  display: grid;
+  gap: 0.7rem;
+}
+
+label {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.95rem;
+}
+
+input,
+textarea,
+select,
+button {
+  font: inherit;
+}
+
+input,
+textarea,
+select {
+  background: #14183a;
+  border: 1px solid #424a8f;
+  color: var(--text);
+  border-radius: 6px;
+  padding: 0.45rem 0.55rem;
+}
+
+textarea {
+  min-height: 90px;
+}
+
+button {
+  background: var(--accent);
+  border: 0;
+  border-radius: 6px;
+  color: #04112f;
+  padding: 0.5rem 0.7rem;
+  cursor: pointer;
+}
+
+button.ghost {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid #4d5599;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.list {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.item {
+  background: #14183a;
+  border: 1px solid #3f478a;
+  border-radius: 8px;
+  padding: 0.7rem;
+}
+
+.item h4 {
+  margin: 0.2rem 0;
+}
+
+.meta {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.notice {
+  color: var(--muted);
+}
+
+.warn {
+  color: var(--danger);
+}
+
+.ok {
+  color: var(--ok);
+}
