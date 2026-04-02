@@ -1,5 +1,11 @@
 const STORAGE_KEY = "gesellschaft-project-v2";
 const hierarchy = ["User", "Enforcer", "Admin", "Core"];
+const rankMap = {
+  user: "User",
+  enforcer: "Enforcer",
+  admin: "Admin",
+  core: "Core",
+};
 
 const initialState = {
   users: [
@@ -38,6 +44,7 @@ const initialState = {
 };
 
 let state = loadState();
+normalizeState(state);
 state.activeUserId = null;
 saveState();
 
@@ -55,9 +62,20 @@ function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
+function canonicalRank(rank) {
+  return rankMap[String(rank || "").toLowerCase()] || rank;
+}
+
+function normalizeState(currentState) {
+  currentState.users = (currentState.users || []).map((user) => ({
+    ...user,
+    rank: canonicalRank(user.rank),
+  }));
+}
+
 const $ = (selector) => document.querySelector(selector);
 const activeUser = () => state.users.find((u) => u.id === Number(state.activeUserId)) || null;
-const canApprove = (u) => u && ["Admin", "Core"].includes(u.rank);
+const canApprove = (u) => u && ["Admin", "Core"].includes(canonicalRank(u.rank));
 const isAdminOrCore = canApprove;
 
 function hasAccess(file, user) {
@@ -568,7 +586,11 @@ function renderRules() {
 }
 
 function setupChats() {
-  $("#chatCreateForm").addEventListener("submit", (e) => {
+  const chatCreateForm = $("#chatCreateForm");
+  const chatInviteForm = $("#chatInviteForm");
+  if (!chatCreateForm || !chatInviteForm) return;
+
+  chatCreateForm.addEventListener("submit", (e) => {
     e.preventDefault();
     const user = guardLoggedIn();
     if (!user) return;
@@ -592,7 +614,7 @@ function setupChats() {
     renderAll();
   });
 
-  $("#chatInviteForm").addEventListener("submit", (e) => {
+  chatInviteForm.addEventListener("submit", (e) => {
     e.preventDefault();
     const user = guardLoggedIn();
     if (!user) return;
@@ -635,6 +657,7 @@ function renderChats() {
   const chatList = $("#chatList");
   const createForm = $("#chatCreateForm");
   const inviteForm = $("#chatInviteForm");
+  if (!chatList || !createForm || !inviteForm) return;
   if (!user) {
     createForm.style.display = "none";
     inviteForm.style.display = "none";
@@ -772,6 +795,7 @@ window.adminDeleteFile = (fileId) => {
 function renderAdminMenu() {
   const user = activeUser();
   const adminTab = document.querySelector('[data-tab="admin"]');
+  if (!adminTab) return;
   if (!isAdminOrCore(user)) {
     adminTab.classList.add("hidden");
     $("#adminUserList").innerHTML = '<p class="notice">Admin/Core only.</p>';
