@@ -24,6 +24,7 @@ const initialState = {
   lockRequests: [],
   identityRequests: [],
   tasks: [],
+  chats: [],
   rules: [
     {
       id: crypto.randomUUID(),
@@ -68,6 +69,10 @@ function hasAccess(file, user) {
 
 function rankAtMost(current, limit) {
   return hierarchy.indexOf(current) <= hierarchy.indexOf(limit);
+}
+
+function canManageChatLimit(user) {
+  return !!user && ["Admin", "Core"].includes(user.rank);
 }
 
 function setupTabs() {
@@ -562,6 +567,107 @@ function renderRules() {
     .join("") || '<p class="notice">No rule requests.</p>';
 }
 
+function setupChats() {
+  $("#chatCreateForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const user = guardLoggedIn();
+    if (!user) return;
+
+    const name = $("#chatName").value.trim();
+    if (!name) return;
+
+    const createdByRestrictedRank = ["User", "Enforcer"].includes(user.rank);
+    state.chats.push({
+      id: crypto.randomUUID().slice(0, 8),
+      name,
+      createdBy: user.id,
+      members: [user.id],
+      memberLimit: createdByRestrictedRank ? 10 : null,
+      limitLiftedBy: null,
+      createdAt: new Date().toISOString(),
+    });
+
+    saveState();
+    e.target.reset();
+    renderAll();
+  });
+
+  $("#chatInviteForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const user = guardLoggedIn();
+    if (!user) return;
+
+    const chatId = $("#inviteChatId").value.trim();
+    const targetUserId = Number($("#inviteUserId").value);
+    const targetUser = state.users.find((u) => u.id === targetUserId);
+    const chat = state.chats.find((c) => c.id === chatId);
+    if (!chat || !targetUser) return;
+
+    const userIsMember = chat.members.includes(user.id);
+    if (!userIsMember && !canManageChatLimit(user)) return;
+    if (chat.members.includes(targetUserId)) return;
+
+    if (Number.isFinite(chat.memberLimit) && chat.members.length >= chat.memberLimit) {
+      alert("This chat has reached its member limit.");
+      return;
+    }
+
+    chat.members.push(targetUserId);
+    saveState();
+    e.target.reset();
+    renderAll();
+  });
+}
+
+window.liftChatLimit = (chatId) => {
+  const user = guardLoggedIn();
+  if (!canManageChatLimit(user)) return;
+  const chat = state.chats.find((c) => c.id === chatId);
+  if (!chat) return;
+  chat.memberLimit = null;
+  chat.limitLiftedBy = user.id;
+  saveState();
+  renderAll();
+};
+
+function renderChats() {
+  const user = activeUser();
+  const chatList = $("#chatList");
+  const createForm = $("#chatCreateForm");
+  const inviteForm = $("#chatInviteForm");
+  if (!user) {
+    createForm.style.display = "none";
+    inviteForm.style.display = "none";
+    chatList.innerHTML = '<p class="notice">Login required.</p>';
+    return;
+  }
+
+  createForm.style.display = "grid";
+  inviteForm.style.display = "grid";
+
+  const visibleChats = state.chats.filter((chat) => chat.members.includes(user.id) || canManageChatLimit(user));
+  chatList.innerHTML = visibleChats
+    .map((chat) => {
+      const creator = state.users.find((u) => u.id === chat.createdBy);
+      const memberNames = chat.members
+        .map((memberId) => state.users.find((u) => u.id === memberId))
+        .filter(Boolean)
+        .map((member) => `${member.username} (#${member.id})`)
+        .join(", ");
+      const limitLabel = Number.isFinite(chat.memberLimit) ? `${chat.members.length}/${chat.memberLimit}` : `${chat.members.length}/∞`;
+      const canLift = canManageChatLimit(user) && Number.isFinite(chat.memberLimit);
+      return `<div class="item">
+        <h4>${chat.name}</h4>
+        <p class="meta">Chat ID: <strong>${chat.id}</strong></p>
+        <p class="meta">Created by: ${creator?.username || `#${chat.createdBy}`}</p>
+        <p class="meta">Members: ${limitLabel}</p>
+        <p>${memberNames || "No members"}</p>
+        ${canLift ? `<button onclick="liftChatLimit('${chat.id}')">Lift Limit (Admin/Core)</button>` : ""}
+      </div>`;
+    })
+    .join("") || '<p class="notice">No chats available.</p>';
+}
+
 function setupTasks() {
   $("#taskForm").addEventListener("submit", (e) => {
     e.preventDefault();
@@ -703,6 +809,7 @@ function renderAll() {
   renderLockRequests();
   renderEnforcerAudit();
   renderRules();
+  renderChats();
   renderIdentity();
   renderTasks();
   renderAdminMenu();
@@ -714,6 +821,7 @@ function bootstrap() {
   setupEnforcerLocks();
   setupSearch();
   setupRules();
+  setupChats();
   setupIdentity();
   setupTasks();
   setupAdminMenu();
