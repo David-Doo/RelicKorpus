@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
+    <canvas id="nodeBackground" aria-hidden="true"></canvas>
+
     <header class="hero">
       <h1>The Gesellschaft Project</h1>
       <p>A controlled archival and management system designed to protect accuracy while preserving structured freedom.</p>
@@ -30,13 +32,17 @@
 
     <main>
       <section id="home" class="panel active">
-        <h2>Institution Charter</h2>
-        <p>The Gesellschaft hierarchy is: <strong>User &gt; Enforcer &gt; Admin &gt; Core</strong>. Accounts are created by Admin or Core only.</p>
+        <article>
+          <h2>Main Home Screen</h2>
+          <p>The Gesellschaft hierarchy is: <strong>User &gt; Enforcer &gt; Admin &gt; Core</strong>. Accounts are created by Admin or Core only.</p>
+          <p class="meta">Use the square command buttons below to move through available functions.</p>
+          <div id="homeQuickNav" class="portal-grid"></div>
+        </article>
       </section>
 
       <section id="files" class="panel">
         <div class="grid">
-          <article>
+          <article id="filesCreateCard">
             <h2>Create / Amend File</h2>
             <form id="fileForm">
               <input type="hidden" id="fileId" />
@@ -65,15 +71,15 @@
         </div>
 
         <div class="grid">
-          <article>
+          <article id="permissionRequestsCard">
             <h3>Permission Requests</h3>
             <div id="permissionRequests" class="list"></div>
           </article>
-          <article>
+          <article id="lockRequestsCard">
             <h3>Edit Locks (Enforcer Requests)</h3>
             <div id="lockRequests" class="list"></div>
           </article>
-          <article>
+          <article id="enforcerAuditCard">
             <h3>Enforcer Edit Audit (Admin/Core)</h3>
             <div id="enforcerAudit" class="list"></div>
           </article>
@@ -121,7 +127,7 @@
 
       <section id="tasks" class="panel">
         <div class="grid">
-          <article>
+          <article id="taskAssignCard">
             <h2>Task Assignment</h2>
             <form id="taskForm">
               <label>Task Title <input id="taskTitle" required /></label>

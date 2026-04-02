@@ -1,7 +1,7 @@
 :root {
   --bg: #0f1020;
-  --panel: #171935;
-  --card: #1f2247;
+  --panel: #171935ee;
+  --card: #1f2247de;
   --text: #eef1ff;
   --muted: #a8b0d9;
   --accent: #6ea8fe;
@@ -16,14 +16,25 @@
 body {
   margin: 0;
   font-family: Inter, system-ui, sans-serif;
-  background: linear-gradient(180deg, #0a0b17, #101333);
+  background: radial-gradient(circle at top, #101634, #0a0b17 60%);
   color: var(--text);
+  min-height: 100vh;
+}
+
+#nodeBackground {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  filter: saturate(120%) blur(0.2px);
 }
 
 .hero {
   padding: 1.25rem;
   background: var(--panel);
   border-bottom: 1px solid #303467;
+  backdrop-filter: blur(6px);
 }
 
 .hero h1 {
@@ -49,24 +60,33 @@ body {
 }
 
 .tabs {
-  display: flex;
+  display: grid;
   gap: 0.5rem;
   padding: 0.75rem 1rem;
   border-bottom: 1px solid #303467;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
 }
 
-.tab {
-  background: transparent;
-  border: 1px solid #3d447f;
+.tab,
+.portal-btn {
+  background: linear-gradient(180deg, #1c2358, #1a214c);
+  border: 1px solid #4b56a8;
   color: var(--text);
-  padding: 0.45rem 0.8rem;
-  border-radius: 6px;
+  border-radius: 10px;
   cursor: pointer;
+  aspect-ratio: 1 / 1;
+  width: 100%;
+  min-height: 88px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 0.5rem;
 }
 
-.tab.active {
-  background: var(--accent);
-  color: #08102c;
+.tab.active,
+.portal-btn:hover {
+  background: linear-gradient(180deg, #86b7ff, #6ea8fe);
+  color: #07122b;
 }
 
 main {
@@ -81,6 +101,13 @@ main {
   display: block;
 }
 
+.portal-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  margin-top: 1rem;
+}
+
 .grid {
   display: grid;
   gap: 1rem;
@@ -93,6 +120,7 @@ article {
   border: 1px solid #353b77;
   border-radius: 10px;
   padding: 1rem;
+  backdrop-filter: blur(6px);
 }
 
 form {
@@ -179,7 +207,6 @@ button.ghost {
 .ok {
   color: var(--ok);
 }
-
 
 .hidden {
   display: none !important;
