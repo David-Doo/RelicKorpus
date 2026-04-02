@@ -30,6 +30,8 @@ const initialState = {
 };
 
 let state = loadState();
+state.activeUserId = null;
+saveState();
 
 function loadState() {
   const raw = localStorage.getItem(STORAGE_KEY);
@@ -81,11 +83,7 @@ function renderAuth() {
     sessionBlock.classList.add("hidden");
     authBlock.innerHTML = `
       <form id="loginForm" class="auth-row">
-        <label>User
-          <select id="loginUserId">
-            ${state.users.map((u) => `<option value="${u.id}">${u.username} (#${u.id})</option>`).join("")}
-          </select>
-        </label>
+        <label>User ID <input id="loginUserId" type="number" min="1" required /></label>
         <label>Password <input id="loginPassword" type="password" required /></label>
         <button type="submit">Login</button>
       </form>
