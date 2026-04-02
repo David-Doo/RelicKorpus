@@ -9,13 +9,13 @@
   <body>
     <header class="hero">
       <h1>The Gesellschaft Project</h1>
-      <p>
-        A controlled archival and management system designed to protect accuracy while preserving structured freedom.
-      </p>
-      <div class="session-strip">
-        <label for="activeUser">Active Account:</label>
-        <select id="activeUser"></select>
+      <p>A controlled archival and management system designed to protect accuracy while preserving structured freedom.</p>
+
+      <div id="authBlock" class="auth"></div>
+      <div id="sessionBlock" class="session-strip hidden">
+        <span id="activeIdentity"></span>
         <span id="activeRole" class="badge"></span>
+        <button id="logoutBtn" class="ghost">Log Out</button>
       </div>
     </header>
 
@@ -25,21 +25,13 @@
       <button class="tab" data-tab="search">Search Files</button>
       <button class="tab" data-tab="identity">Player Identification</button>
       <button class="tab" data-tab="tasks">Scheduled Tasks</button>
+      <button class="tab hidden" data-tab="admin">Admin Menu</button>
     </nav>
 
     <main>
       <section id="home" class="panel active">
         <h2>Institution Charter</h2>
-        <p>
-          The Gesellschaft hierarchy is: <strong>User &gt; Enforcer &gt; Admin &gt; Core</strong>. Accounts are created by Admin or Core only.
-        </p>
-        <ul>
-          <li>Users can view public files and restricted summaries, then submit access requests.</li>
-          <li>User edits are marked in bold and tagged with the editor's ID.</li>
-          <li>Enforcers can edit without bold insertion and submit moderation lock requests (up to one week).</li>
-          <li>Admins manage users, approval workflows, and tasking.</li>
-          <li>The Core governs and maintains the complete system.</li>
-        </ul>
+        <p>The Gesellschaft hierarchy is: <strong>User &gt; Enforcer &gt; Admin &gt; Core</strong>. Accounts are created by Admin or Core only.</p>
       </section>
 
       <section id="files" class="panel">
@@ -137,6 +129,31 @@
           <article>
             <h2>Task Board</h2>
             <div id="taskList" class="list"></div>
+          </article>
+        </div>
+      </section>
+
+      <section id="admin" class="panel">
+        <div class="grid">
+          <article>
+            <h2>User Management (Admin/Core)</h2>
+            <form id="adminCreateUserForm">
+              <label>Username <input id="adminUserName" placeholder="Adjective & Adjective Rank" required /></label>
+              <label>Rank
+                <select id="adminUserRank">
+                  <option>User</option>
+                  <option>Enforcer</option>
+                  <option>Admin</option>
+                </select>
+              </label>
+              <label>Password <input id="adminUserPassword" type="password" required /></label>
+              <button type="submit">Create User</button>
+            </form>
+            <div id="adminUserList" class="list"></div>
+          </article>
+          <article>
+            <h2>File Management (Admin/Core)</h2>
+            <div id="adminFileList" class="list"></div>
           </article>
         </div>
       </section>

@@ -1,8 +1,5 @@
-const STORAGE_KEY = "gesellschaft-project-v1";
-
+const STORAGE_KEY = "gesellschaft-project-v2";
 const hierarchy = ["User", "Enforcer", "Admin", "Core"];
-const canApprove = (user) => ["Admin", "Core"].includes(user.rank);
-const isAdminOrCore = canApprove;
 
 const initialState = {
   users: [
@@ -11,7 +8,7 @@ const initialState = {
     { id: 3, username: "Stern & Iron Enforcer", rank: "Enforcer", password: "enforcer-pass" },
     { id: 4, username: "Curious & Silver User", rank: "User", password: "user-pass" },
   ],
-  activeUserId: 1,
+  activeUserId: null,
   files: [
     {
       id: crypto.randomUUID(),
@@ -34,9 +31,6 @@ const initialState = {
 
 let state = loadState();
 
-const activeUserSelect = document.querySelector("#activeUser");
-const activeRole = document.querySelector("#activeRole");
-
 function loadState() {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) return structuredClone(initialState);
@@ -51,436 +45,229 @@ function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
-function activeUser() {
-  return state.users.find((u) => u.id === Number(state.activeUserId));
+const $ = (selector) => document.querySelector(selector);
+const activeUser = () => state.users.find((u) => u.id === Number(state.activeUserId)) || null;
+const canApprove = (u) => u && ["Admin", "Core"].includes(u.rank);
+const isAdminOrCore = canApprove;
+
+function hasAccess(file, user) {
+  if (!user) return false;
+  if (file.visibility === "public") return true;
+  if (["Enforcer", "Admin", "Core"].includes(user.rank)) return true;
+  return state.permissionRequests.some((r) => r.fileId === file.id && r.userId === user.id && r.status === "approved");
 }
 
-function tabSwitching() {
+function rankAtMost(current, limit) {
+  return hierarchy.indexOf(current) <= hierarchy.indexOf(limit);
+}
+
+function setupTabs() {
   document.querySelectorAll(".tab").forEach((btn) => {
     btn.addEventListener("click", () => {
       document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
       document.querySelectorAll(".panel").forEach((p) => p.classList.remove("active"));
       btn.classList.add("active");
-      document.querySelector(`#${btn.dataset.tab}`).classList.add("active");
+      document.getElementById(btn.dataset.tab).classList.add("active");
     });
   });
 }
 
-function renderActiveUsers() {
-  activeUserSelect.innerHTML = state.users
-    .map((u) => `<option value="${u.id}">${u.username} (#${u.id})</option>`)
-    .join("");
-  activeUserSelect.value = String(state.activeUserId);
+function renderAuth() {
+  const authBlock = $("#authBlock");
+  const sessionBlock = $("#sessionBlock");
   const user = activeUser();
-  activeRole.textContent = user.rank;
+
+  if (!user) {
+    sessionBlock.classList.add("hidden");
+    authBlock.innerHTML = `
+      <form id="loginForm" class="auth-row">
+        <label>User
+          <select id="loginUserId">
+            ${state.users.map((u) => `<option value="${u.id}">${u.username} (#${u.id})</option>`).join("")}
+          </select>
+        </label>
+        <label>Password <input id="loginPassword" type="password" required /></label>
+        <button type="submit">Login</button>
+      </form>
+      <p class="meta">Login is required before any action can be performed.</p>
+    `;
+
+    $("#loginForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const userId = Number($("#loginUserId").value);
+      const password = $("#loginPassword").value;
+      const account = state.users.find((u) => u.id === userId);
+      if (!account || account.password !== password) {
+        alert("Invalid ID/password combination.");
+        return;
+      }
+      state.activeUserId = account.id;
+      saveState();
+      renderAll();
+    });
+    return;
+  }
+
+  authBlock.innerHTML = "";
+  sessionBlock.classList.remove("hidden");
+  $("#activeIdentity").textContent = `${user.username} (#${user.id})`;
+  $("#activeRole").textContent = user.rank;
+  $("#logoutBtn").onclick = () => {
+    state.activeUserId = null;
+    saveState();
+    renderAll();
+  };
 }
 
-function hasAccess(file, user) {
-  if (file.visibility === "public") return true;
-  if (isAdminOrCore(user) || user.rank === "Enforcer") return true;
-  return state.permissionRequests.some(
-    (r) => r.fileId === file.id && r.userId === user.id && r.status === "approved"
-  );
-}
-
-function isLockedForUser(user) {
-  const now = Date.now();
-  return state.files.some((f) =>
-    f.locks?.some((lock) => lock.userId === user.id && new Date(lock.until).getTime() > now)
-  );
+function guardLoggedIn() {
+  const user = activeUser();
+  if (!user) {
+    alert("Please log in first.");
+    return null;
+  }
+  return user;
 }
 
 function renderFiles() {
   const user = activeUser();
-  const list = document.querySelector("#fileList");
-
-  if (!state.files.length) {
-    list.innerHTML = `<p class="notice">No files yet.</p>`;
+  const list = $("#fileList");
+  if (!user) {
+    list.innerHTML = `<p class="notice">Login required.</p>`;
     return;
   }
 
   list.innerHTML = state.files
     .map((file) => {
       const access = hasAccess(file, user);
-      const canDelete = isAdminOrCore(user);
-      const needsApproval = file.visibility === "restricted" && !access;
-
-      return `
-        <div class="item">
-          <h4>${file.name}</h4>
-          <div class="meta">Tags: ${file.tags.join(", ")} • Visibility: ${file.visibility}</div>
-          <p><strong>Summary:</strong> ${file.summary}</p>
-          ${access ? `<p><strong>Content:</strong> ${file.content}</p>` : `<p class="warn">Restricted content hidden.</p>`}
-          ${access ? `<p><strong>Attachments:</strong> ${file.attachments.join(", ") || "None"}</p>` : ""}
-          <div class="actions">
-            <button onclick="editFile('${file.id}')" ${!access && user.rank === "User" ? "disabled" : ""}>Edit</button>
-            ${canDelete ? `<button onclick="deleteFile('${file.id}')">Delete</button>` : ""}
-            ${needsApproval ? `<button onclick="requestAccess('${file.id}')">Request Access</button>` : ""}
-          </div>
-        </div>`;
+      const restricted = file.visibility === "restricted" && !access;
+      return `<div class="item">
+        <h4>${file.name}</h4>
+        <p class="meta">Tags: ${file.tags.join(", ")} • Visibility: ${file.visibility}</p>
+        <p><strong>Summary:</strong> ${file.summary}</p>
+        ${restricted ? '<p class="warn">Restricted content hidden.</p>' : `<p><strong>Content:</strong> ${file.content}</p>`}
+        ${restricted ? "" : `<p><strong>Attachments:</strong> ${file.attachments.join(", ") || "None"}</p>`}
+        <div class="actions">
+          <button onclick="editFile('${file.id}')" ${restricted ? "disabled" : ""}>Edit</button>
+          ${restricted ? `<button onclick="requestAccess('${file.id}')">Request Access</button>` : ""}
+        </div>
+      </div>`;
     })
     .join("");
 }
 
 window.editFile = (fileId) => {
+  const user = guardLoggedIn();
+  if (!user) return;
   const file = state.files.find((f) => f.id === fileId);
-  const user = activeUser();
-  if (!file) return;
-  if (user.rank === "User" && !hasAccess(file, user)) return;
-  if (user.rank === "User" && isLockedForUser(user)) {
-    alert("Editing is temporarily suspended for your account.");
+  if (!file || !hasAccess(file, user)) return;
+
+  const locked = state.files.some((f) =>
+    (f.locks || []).some((l) => l.userId === user.id && new Date(l.until).getTime() > Date.now())
+  );
+  if (user.rank === "User" && locked) {
+    alert("Your editing privileges are temporarily locked.");
     return;
   }
 
-  document.querySelector("#fileId").value = file.id;
-  document.querySelector("#fileName").value = file.name;
-  document.querySelector("#fileTags").value = file.tags.join(", ");
-  document.querySelector("#fileSummary").value = file.summary;
-  document.querySelector("#fileContent").value = file.content;
-  document.querySelector("#fileAttachments").value = file.attachments.join(", ");
-  document.querySelector("#fileVisibility").value = file.visibility;
-};
-
-window.deleteFile = (fileId) => {
-  const user = activeUser();
-  if (!isAdminOrCore(user)) return;
-  state.files = state.files.filter((f) => f.id !== fileId);
-  saveState();
-  renderAll();
+  $("#fileId").value = file.id;
+  $("#fileName").value = file.name;
+  $("#fileTags").value = file.tags.join(", ");
+  $("#fileSummary").value = file.summary;
+  $("#fileContent").value = file.content;
+  $("#fileAttachments").value = file.attachments.join(", ");
+  $("#fileVisibility").value = file.visibility;
 };
 
 window.requestAccess = (fileId) => {
-  const user = activeUser();
-  const existing = state.permissionRequests.find(
-    (r) => r.fileId === fileId && r.userId === user.id && r.status === "pending"
-  );
-  if (existing) return;
-  state.permissionRequests.push({
-    id: crypto.randomUUID(),
-    fileId,
-    userId: user.id,
-    status: "pending",
-    requestedAt: new Date().toISOString(),
-  });
+  const user = guardLoggedIn();
+  if (!user) return;
+  if (state.permissionRequests.some((r) => r.fileId === fileId && r.userId === user.id && r.status === "pending")) return;
+  state.permissionRequests.push({ id: crypto.randomUUID(), fileId, userId: user.id, status: "pending" });
   saveState();
   renderAll();
 };
-
-function renderPermissionRequests() {
-  const container = document.querySelector("#permissionRequests");
-  const user = activeUser();
-  const reqs = state.permissionRequests;
-
-  if (!reqs.length) {
-    container.innerHTML = `<p class="notice">No permission requests.</p>`;
-    return;
-  }
-
-  container.innerHTML = reqs
-    .map((req) => {
-      const file = state.files.find((f) => f.id === req.fileId);
-      const reqUser = state.users.find((u) => u.id === req.userId);
-      return `<div class="item">
-        <div><strong>${reqUser.username}</strong> requested <em>${file?.name || "missing file"}</em></div>
-        <div class="meta">Status: ${req.status}</div>
-        ${canApprove(user) && req.status === "pending"
-          ? `<div class="actions">
-            <button onclick="decidePermission('${req.id}','approved')">Approve</button>
-            <button onclick="decidePermission('${req.id}','denied')">Deny</button>
-          </div>`
-          : ""}
-      </div>`;
-    })
-    .join("");
-}
-
-window.decidePermission = (requestId, status) => {
-  const user = activeUser();
-  if (!canApprove(user)) return;
-  const req = state.permissionRequests.find((r) => r.id === requestId);
-  if (!req) return;
-  req.status = status;
-  req.decidedBy = user.id;
-  req.decidedAt = new Date().toISOString();
-  saveState();
-  renderAll();
-};
-
-function renderLockRequests() {
-  const user = activeUser();
-  const container = document.querySelector("#lockRequests");
-  const reqs = state.lockRequests;
-
-  if (!reqs.length) {
-    container.innerHTML = `<p class="notice">No lock requests.</p>`;
-    return;
-  }
-
-  container.innerHTML = reqs
-    .map((req) => {
-      const target = state.users.find((u) => u.id === req.targetUserId);
-      return `<div class="item">
-        <div>Target: ${target?.username || "unknown"} • Duration: ${req.days} day(s)</div>
-        <div class="meta">Reason: ${req.reason} • Status: ${req.status}</div>
-        ${canApprove(user) && req.status === "pending"
-          ? `<div class="actions">
-          <button onclick="decideLock('${req.id}','approved')">Approve</button>
-          <button onclick="decideLock('${req.id}','denied')">Deny</button>
-        </div>`
-          : ""}
-      </div>`;
-    })
-    .join("");
-}
-
-window.decideLock = (requestId, status) => {
-  const approver = activeUser();
-  if (!canApprove(approver)) return;
-  const req = state.lockRequests.find((r) => r.id === requestId);
-  if (!req) return;
-  req.status = status;
-  req.decidedBy = approver.id;
-  if (status === "approved") {
-    const until = new Date(Date.now() + req.days * 24 * 60 * 60 * 1000).toISOString();
-    state.files.forEach((file) => {
-      file.locks = file.locks || [];
-      file.locks.push({ userId: req.targetUserId, until, reason: req.reason });
-    });
-  }
-  saveState();
-  renderAll();
-};
-
-function renderEnforcerAudit() {
-  const user = activeUser();
-  const container = document.querySelector("#enforcerAudit");
-  if (!isAdminOrCore(user)) {
-    container.innerHTML = `<p class="notice">Visible to Admin/Core only.</p>`;
-    return;
-  }
-
-  const logs = state.files.flatMap((f) =>
-    (f.enforcerEdits || []).map((e) => ({
-      file: f.name,
-      ...e,
-    }))
-  );
-
-  if (!logs.length) {
-    container.innerHTML = `<p class="notice">No enforcer edits recorded yet.</p>`;
-    return;
-  }
-
-  container.innerHTML = logs
-    .map(
-      (log) => `<div class="item">
-      <div><strong>${log.file}</strong> edited by #${log.userId}</div>
-      <div class="meta">${new Date(log.editedAt).toLocaleString()}</div>
-      <p>${log.changeNote}</p>
-    </div>`
-    )
-    .join("");
-}
 
 function setupFileForm() {
-  document.querySelector("#fileForm").addEventListener("submit", (e) => {
+  $("#fileForm").addEventListener("submit", (e) => {
     e.preventDefault();
-    const user = activeUser();
-    const id = document.querySelector("#fileId").value || crypto.randomUUID();
+    const user = guardLoggedIn();
+    if (!user) return;
+
+    const id = $("#fileId").value || crypto.randomUUID();
     const payload = {
       id,
-      name: document.querySelector("#fileName").value.trim(),
-      tags: document
-        .querySelector("#fileTags")
-        .value.split(",")
-        .map((x) => x.trim())
-        .filter(Boolean),
-      summary: document.querySelector("#fileSummary").value.trim(),
-      content: document.querySelector("#fileContent").value.trim(),
-      attachments: document
-        .querySelector("#fileAttachments")
-        .value.split(",")
-        .map((x) => x.trim())
-        .filter(Boolean),
-      visibility: document.querySelector("#fileVisibility").value,
+      name: $("#fileName").value.trim(),
+      tags: $("#fileTags").value.split(",").map((t) => t.trim()).filter(Boolean),
+      summary: $("#fileSummary").value.trim(),
+      content: $("#fileContent").value.trim(),
+      attachments: $("#fileAttachments").value.split(",").map((a) => a.trim()).filter(Boolean),
+      visibility: $("#fileVisibility").value,
     };
 
     const existing = state.files.find((f) => f.id === id);
     if (existing) {
-      const oldContent = existing.content;
-      if (user.rank === "User") {
-        payload.content = `<strong>${payload.content}</strong> [UID:${user.id}]`;
-      }
+      if (!hasAccess(existing, user)) return;
+      if (user.rank === "User") payload.content = `<strong>${payload.content}</strong> [UID:${user.id}]`;
       if (user.rank === "Enforcer") {
-        existing.enforcerEdits = existing.enforcerEdits || [];
         existing.enforcerEdits.push({
           userId: user.id,
           editedAt: new Date().toISOString(),
-          changeNote: `Changed content from \"${oldContent.slice(0, 30)}...\"`,
+          changeNote: `Content updated by Enforcer #${user.id}`,
         });
       }
       Object.assign(existing, payload);
-      existing.history = existing.history || [];
       existing.history.push({ by: user.id, at: new Date().toISOString() });
     } else {
       state.files.push({ ...payload, history: [{ by: user.id, at: new Date().toISOString() }], enforcerEdits: [], locks: [] });
     }
 
     saveState();
-    clearFileForm();
+    e.target.reset();
+    $("#fileId").value = "";
     renderAll();
   });
 
-  document.querySelector("#clearFileForm").addEventListener("click", clearFileForm);
-}
-
-function clearFileForm() {
-  document.querySelector("#fileId").value = "";
-  document.querySelector("#fileForm").reset();
-}
-
-function setupSearch() {
-  const input = document.querySelector("#searchInput");
-  input.addEventListener("input", () => {
-    const q = input.value.toLowerCase().trim();
-    const user = activeUser();
-    const results = state.files.filter((f) => {
-      const text = [f.name, f.summary, f.tags.join(" ")].join(" ").toLowerCase();
-      return text.includes(q);
-    });
-
-    const container = document.querySelector("#searchResults");
-    container.innerHTML = results
-      .map((file) => {
-        const access = hasAccess(file, user);
-        return `<div class="item">
-          <h4>${file.name}</h4>
-          <p>${file.summary}</p>
-          <p class="meta">Tags: ${file.tags.join(", ")}</p>
-          ${access ? `<p>${file.content}</p>` : `<p class="warn">Restricted content hidden.</p>`}
-        </div>`;
-      })
-      .join("") || `<p class="notice">No matches.</p>`;
+  $("#clearFileForm").addEventListener("click", () => {
+    $("#fileForm").reset();
+    $("#fileId").value = "";
   });
 }
 
-function renderIdentity() {
+function renderPermissionRequests() {
   const user = activeUser();
-  document.querySelector("#identityCard").innerHTML = `
-    <div class="item">
-      <h4>${user.username}</h4>
-      <p>Name: ${user.username}</p>
-      <p>ID: ${user.id}</p>
-      <p>Rank: ${user.rank}</p>
-    </div>`;
+  const container = $("#permissionRequests");
+  if (!state.permissionRequests.length) {
+    container.innerHTML = '<p class="notice">No permission requests.</p>';
+    return;
+  }
 
-  const reqList = document.querySelector("#identityRequests");
-  reqList.innerHTML = state.identityRequests
+  container.innerHTML = state.permissionRequests
     .map((r) => {
-      const reqUser = state.users.find((u) => u.id === r.userId);
+      const requester = state.users.find((u) => u.id === r.userId);
+      const file = state.files.find((f) => f.id === r.fileId);
       return `<div class="item">
-        <p>#${r.userId} ${reqUser?.username} requested <strong>${r.newName}</strong> / ${r.newRank}</p>
+        <p>${requester?.username || "Unknown"} requested access to ${file?.name || "Missing file"}</p>
         <p class="meta">Status: ${r.status}</p>
-        ${canApprove(user) && r.status === "pending"
-          ? `<div class="actions">
-              <button onclick="decideIdentity('${r.id}','approved')">Approve</button>
-              <button onclick="decideIdentity('${r.id}','denied')">Deny</button>
-            </div>`
-          : ""}
+        ${canApprove(user) && r.status === "pending" ? `<button onclick="decidePermission('${r.id}','approved')">Approve</button> <button onclick="decidePermission('${r.id}','denied')">Deny</button>` : ""}
       </div>`;
     })
-    .join("") || `<p class="notice">No identity requests.</p>`;
+    .join("");
 }
 
-function setupIdentityRequest() {
-  document.querySelector("#identityRequestForm").addEventListener("submit", (e) => {
-    e.preventDefault();
-    const user = activeUser();
-    state.identityRequests.push({
-      id: crypto.randomUUID(),
-      userId: user.id,
-      newName: document.querySelector("#requestedName").value.trim(),
-      newRank: document.querySelector("#requestedRank").value,
-      status: "pending",
-    });
-    saveState();
-    e.target.reset();
-    renderAll();
-  });
-}
-
-window.decideIdentity = (requestId, status) => {
-  const approver = activeUser();
-  if (!canApprove(approver)) return;
-  const req = state.identityRequests.find((r) => r.id === requestId);
+window.decidePermission = (id, status) => {
+  const user = guardLoggedIn();
+  if (!canApprove(user)) return;
+  const req = state.permissionRequests.find((r) => r.id === id);
   if (!req) return;
   req.status = status;
-  if (status === "approved") {
-    const target = state.users.find((u) => u.id === req.userId);
-    if (target) {
-      target.username = req.newName;
-      if (approver.rank === "Core" || req.newRank !== "Core") target.rank = req.newRank;
-    }
-  }
   saveState();
   renderAll();
 };
 
-function setupTasks() {
-  document.querySelector("#taskForm").addEventListener("submit", (e) => {
-    e.preventDefault();
-    const user = activeUser();
-    if (!isAdminOrCore(user)) return;
-
-    state.tasks.push({
-      id: crypto.randomUUID(),
-      title: document.querySelector("#taskTitle").value.trim(),
-      description: document.querySelector("#taskDescription").value.trim(),
-      forRank: document.querySelector("#taskRank").value,
-      status: "open",
-      assignedBy: user.id,
-    });
-
-    saveState();
-    e.target.reset();
-    renderAll();
-  });
-}
-
-function renderTasks() {
-  const user = activeUser();
-  const taskList = document.querySelector("#taskList");
-  const isEligible = (task) => hierarchy.indexOf(user.rank) <= hierarchy.indexOf(task.forRank);
-
-  taskList.innerHTML = state.tasks
-    .filter((task) => isEligible(task) || isAdminOrCore(user))
-    .map((task) => {
-      const showComplete = ["User", "Enforcer"].includes(user.rank) && isEligible(task) && task.status === "open";
-      return `<div class="item">
-        <h4>${task.title}</h4>
-        <p>${task.description}</p>
-        <p class="meta">Assigned to: ${task.forRank} • Status: ${task.status}</p>
-        ${showComplete ? `<button onclick="completeTask('${task.id}')">Mark Complete</button>` : ""}
-      </div>`;
-    })
-    .join("") || `<p class="notice">No tasks available.</p>`;
-
-  document.querySelector("#taskForm").closest("article").style.display = isAdminOrCore(user) ? "block" : "none";
-}
-
-window.completeTask = (taskId) => {
-  const task = state.tasks.find((t) => t.id === taskId);
-  if (!task) return;
-  task.status = "completed";
-  task.completedBy = activeUser().id;
-  saveState();
-  renderAll();
-};
-
-function setupEnforcerLockRequests() {
-  const filePanel = document.querySelector("#files article h2").parentElement;
-  const wrap = document.createElement("div");
-  wrap.innerHTML = `
+function setupEnforcerLocks() {
+  const fileFormArticle = document.querySelector("#files article");
+  const block = document.createElement("div");
+  block.innerHTML = `
     <h3>Submit Edit Lock Request (Enforcer)</h3>
     <form id="lockRequestForm">
       <label>Target User ID <input id="lockTargetUserId" type="number" min="1" required /></label>
@@ -489,19 +276,19 @@ function setupEnforcerLockRequests() {
       <button type="submit">Submit Lock Request</button>
     </form>
   `;
-  filePanel.appendChild(wrap);
+  fileFormArticle.appendChild(block);
 
-  wrap.querySelector("#lockRequestForm").addEventListener("submit", (e) => {
+  $("#lockRequestForm").addEventListener("submit", (e) => {
     e.preventDefault();
-    const user = activeUser();
-    if (user.rank !== "Enforcer") return;
+    const user = guardLoggedIn();
+    if (!user || user.rank !== "Enforcer") return;
 
     state.lockRequests.push({
       id: crypto.randomUUID(),
       requestedBy: user.id,
-      targetUserId: Number(document.querySelector("#lockTargetUserId").value),
-      days: Number(document.querySelector("#lockDays").value),
-      reason: document.querySelector("#lockReason").value.trim(),
+      targetUserId: Number($("#lockTargetUserId").value),
+      days: Number($("#lockDays").value),
+      reason: $("#lockReason").value.trim(),
       status: "pending",
     });
 
@@ -511,30 +298,244 @@ function setupEnforcerLockRequests() {
   });
 }
 
+function renderLockRequests() {
+  const user = activeUser();
+  const list = $("#lockRequests");
+  if (!state.lockRequests.length) {
+    list.innerHTML = '<p class="notice">No lock requests.</p>';
+    return;
+  }
+
+  list.innerHTML = state.lockRequests
+    .map((r) => {
+      const target = state.users.find((u) => u.id === r.targetUserId);
+      return `<div class="item">
+        <p>Target: ${target?.username || "Unknown"} • ${r.days} day(s)</p>
+        <p class="meta">${r.reason} • ${r.status}</p>
+        ${canApprove(user) && r.status === "pending" ? `<button onclick="decideLock('${r.id}','approved')">Approve</button> <button onclick="decideLock('${r.id}','denied')">Deny</button>` : ""}
+      </div>`;
+    })
+    .join("");
+}
+
+window.decideLock = (id, status) => {
+  const user = guardLoggedIn();
+  if (!canApprove(user)) return;
+  const req = state.lockRequests.find((r) => r.id === id);
+  if (!req) return;
+  req.status = status;
+  if (status === "approved") {
+    const until = new Date(Date.now() + req.days * 86400000).toISOString();
+    state.files.forEach((f) => f.locks.push({ userId: req.targetUserId, until, reason: req.reason }));
+  }
+  saveState();
+  renderAll();
+};
+
+function renderEnforcerAudit() {
+  const user = activeUser();
+  const list = $("#enforcerAudit");
+  if (!isAdminOrCore(user)) {
+    list.innerHTML = '<p class="notice">Visible to Admin/Core only.</p>';
+    return;
+  }
+  const logs = state.files.flatMap((f) => f.enforcerEdits.map((e) => ({ file: f.name, ...e })));
+  list.innerHTML = logs.map((l) => `<div class="item"><p><strong>${l.file}</strong> edited by #${l.userId}</p><p class="meta">${l.editedAt}</p><p>${l.changeNote}</p></div>`).join("") || '<p class="notice">No enforcer edits yet.</p>';
+}
+
+function setupSearch() {
+  $("#searchInput").addEventListener("input", () => {
+    const user = activeUser();
+    const q = $("#searchInput").value.toLowerCase().trim();
+    const out = $("#searchResults");
+    if (!user) {
+      out.innerHTML = '<p class="notice">Login required.</p>';
+      return;
+    }
+    const results = state.files.filter((f) => [f.name, f.summary, f.tags.join(" ")].join(" ").toLowerCase().includes(q));
+    out.innerHTML = results.map((f) => `<div class="item"><h4>${f.name}</h4><p>${f.summary}</p>${hasAccess(f, user) ? `<p>${f.content}</p>` : '<p class="warn">Restricted content hidden.</p>'}</div>`).join("") || '<p class="notice">No matches.</p>';
+  });
+}
+
+function setupIdentity() {
+  $("#identityRequestForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const user = guardLoggedIn();
+    if (!user) return;
+    state.identityRequests.push({
+      id: crypto.randomUUID(),
+      userId: user.id,
+      newName: $("#requestedName").value.trim(),
+      newRank: $("#requestedRank").value,
+      status: "pending",
+    });
+    saveState();
+    e.target.reset();
+    renderAll();
+  });
+}
+
+window.decideIdentity = (id, status) => {
+  const user = guardLoggedIn();
+  if (!canApprove(user)) return;
+  const req = state.identityRequests.find((r) => r.id === id);
+  if (!req) return;
+  req.status = status;
+  if (status === "approved") {
+    const target = state.users.find((u) => u.id === req.userId);
+    if (target) {
+      target.username = req.newName;
+      if (req.newRank !== "Core" || user.rank === "Core") target.rank = req.newRank;
+    }
+  }
+  saveState();
+  renderAll();
+};
+
+function renderIdentity() {
+  const user = activeUser();
+  const card = $("#identityCard");
+  const list = $("#identityRequests");
+  if (!user) {
+    card.innerHTML = '<p class="notice">Login required.</p>';
+    list.innerHTML = "";
+    return;
+  }
+
+  card.innerHTML = `<div class="item"><h4>${user.username}</h4><p>Name: ${user.username}</p><p>ID: ${user.id}</p><p>Rank: ${user.rank}</p></div>`;
+  list.innerHTML = state.identityRequests.map((r) => {
+    const requester = state.users.find((u) => u.id === r.userId);
+    return `<div class="item"><p>#${r.userId} ${requester?.username || "Unknown"} requested <strong>${r.newName}</strong> / ${r.newRank}</p><p class="meta">Status: ${r.status}</p>${canApprove(user) && r.status === "pending" ? `<button onclick="decideIdentity('${r.id}','approved')">Approve</button> <button onclick="decideIdentity('${r.id}','denied')">Deny</button>` : ""}</div>`;
+  }).join("") || '<p class="notice">No identity requests.</p>';
+}
+
+function setupTasks() {
+  $("#taskForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const user = guardLoggedIn();
+    if (!isAdminOrCore(user)) return;
+    state.tasks.push({
+      id: crypto.randomUUID(),
+      title: $("#taskTitle").value.trim(),
+      description: $("#taskDescription").value.trim(),
+      forRank: $("#taskRank").value,
+      status: "open",
+      assignedBy: user.id,
+    });
+    saveState();
+    e.target.reset();
+    renderAll();
+  });
+}
+
+window.completeTask = (id) => {
+  const user = guardLoggedIn();
+  if (!user) return;
+  const task = state.tasks.find((t) => t.id === id);
+  if (!task) return;
+  if (!rankAtMost(user.rank, task.forRank) && !isAdminOrCore(user)) return;
+  task.status = "completed";
+  task.completedBy = user.id;
+  saveState();
+  renderAll();
+};
+
+function renderTasks() {
+  const user = activeUser();
+  const board = $("#taskList");
+  const formCard = $("#taskForm").closest("article");
+  if (!user) {
+    board.innerHTML = '<p class="notice">Login required.</p>';
+    formCard.style.display = "none";
+    return;
+  }
+
+  formCard.style.display = isAdminOrCore(user) ? "block" : "none";
+  board.innerHTML = state.tasks
+    .filter((t) => isAdminOrCore(user) || rankAtMost(user.rank, t.forRank))
+    .map((t) => `<div class="item"><h4>${t.title}</h4><p>${t.description}</p><p class="meta">Assigned to ${t.forRank} • ${t.status}</p>${["User", "Enforcer"].includes(user.rank) && t.status === "open" && rankAtMost(user.rank, t.forRank) ? `<button onclick="completeTask('${t.id}')">Mark Complete</button>` : ""}</div>`)
+    .join("") || '<p class="notice">No tasks.</p>';
+}
+
+function setupAdminMenu() {
+  $("#adminCreateUserForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const actor = guardLoggedIn();
+    if (!isAdminOrCore(actor)) return;
+
+    const username = $("#adminUserName").value.trim();
+    const rank = $("#adminUserRank").value;
+    const password = $("#adminUserPassword").value;
+    if (rank === "Core" && actor.rank !== "Core") return;
+
+    const nextId = Math.max(...state.users.map((u) => u.id), 0) + 1;
+    state.users.push({ id: nextId, username, rank, password });
+    saveState();
+    e.target.reset();
+    renderAll();
+  });
+}
+
+window.adminDeleteUser = (userId) => {
+  const actor = guardLoggedIn();
+  if (!isAdminOrCore(actor)) return;
+  const target = state.users.find((u) => u.id === userId);
+  if (!target || target.rank === "Core" || target.id === actor.id) return;
+  if (target.rank === "Admin" && actor.rank !== "Core") return;
+  state.users = state.users.filter((u) => u.id !== userId);
+  saveState();
+  renderAll();
+};
+
+window.adminDeleteFile = (fileId) => {
+  const actor = guardLoggedIn();
+  if (!isAdminOrCore(actor)) return;
+  state.files = state.files.filter((f) => f.id !== fileId);
+  saveState();
+  renderAll();
+};
+
+function renderAdminMenu() {
+  const user = activeUser();
+  const adminTab = document.querySelector('[data-tab="admin"]');
+  if (!isAdminOrCore(user)) {
+    adminTab.classList.add("hidden");
+    $("#adminUserList").innerHTML = '<p class="notice">Admin/Core only.</p>';
+    $("#adminFileList").innerHTML = '<p class="notice">Admin/Core only.</p>';
+    return;
+  }
+
+  adminTab.classList.remove("hidden");
+  $("#adminUserList").innerHTML = state.users
+    .map(
+      (u) => `<div class="item"><p>${u.username} (#${u.id}) — ${u.rank}</p>${u.rank !== "Core" && u.id !== user.id && (user.rank === "Core" || u.rank !== "Admin") ? `<button onclick="adminDeleteUser(${u.id})">Delete User</button>` : ""}</div>`
+    )
+    .join("");
+
+  $("#adminFileList").innerHTML = state.files
+    .map((f) => `<div class="item"><p>${f.name}</p><button onclick="adminDeleteFile('${f.id}')">Delete File</button></div>`)
+    .join("") || '<p class="notice">No files available.</p>';
+}
+
 function renderAll() {
-  renderActiveUsers();
+  renderAuth();
   renderFiles();
   renderPermissionRequests();
   renderLockRequests();
   renderEnforcerAudit();
   renderIdentity();
   renderTasks();
+  renderAdminMenu();
 }
 
 function bootstrap() {
-  tabSwitching();
+  setupTabs();
   setupFileForm();
+  setupEnforcerLocks();
   setupSearch();
-  setupIdentityRequest();
+  setupIdentity();
   setupTasks();
-  setupEnforcerLockRequests();
-
-  activeUserSelect.addEventListener("change", () => {
-    state.activeUserId = Number(activeUserSelect.value);
-    saveState();
-    renderAll();
-  });
-
+  setupAdminMenu();
   renderAll();
 }
 

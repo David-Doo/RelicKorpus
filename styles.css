@@ -179,3 +179,19 @@ button.ghost {
 .ok {
   color: var(--ok);
 }
+
+
+.hidden {
+  display: none !important;
+}
+
+.auth-row {
+  display: flex;
+  gap: 0.7rem;
+  align-items: end;
+  flex-wrap: wrap;
+}
+
+.auth {
+  margin-bottom: 0.8rem;
+}
