@@ -4,9 +4,6 @@ const hierarchy = ["User", "Enforcer", "Admin", "Core"];
 const initialState = {
   users: [
     { id: 1, username: "Foolhardy & Gilded Core", rank: "Core", password: "core-pass" },
-    { id: 2, username: "Watchful & Amber Admin", rank: "Admin", password: "admin-pass" },
-    { id: 3, username: "Stern & Iron Enforcer", rank: "Enforcer", password: "enforcer-pass" },
-    { id: 4, username: "Curious & Silver User", rank: "User", password: "user-pass" },
   ],
   activeUserId: null,
   files: [
@@ -234,6 +231,10 @@ function setupFileForm() {
 function renderPermissionRequests() {
   const user = activeUser();
   const container = $("#permissionRequests");
+  if (!isAdminOrCore(user)) {
+    container.innerHTML = '<p class="notice">Visible to Admin/Core only.</p>';
+    return;
+  }
   if (!state.permissionRequests.length) {
     container.innerHTML = '<p class="notice">No permission requests.</p>';
     return;
@@ -371,6 +372,28 @@ function setupIdentity() {
     e.target.reset();
     renderAll();
   });
+
+  $("#passwordChangeForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const user = guardLoggedIn();
+    if (!user) return;
+    const currentPassword = $("#currentPassword").value;
+    const newPassword = $("#newPassword").value.trim();
+
+    if (user.password !== currentPassword) {
+      $("#passwordStatus").textContent = "Current password is incorrect.";
+      return;
+    }
+    if (newPassword.length < 4) {
+      $("#passwordStatus").textContent = "New password must be at least 4 characters.";
+      return;
+    }
+
+    user.password = newPassword;
+    saveState();
+    e.target.reset();
+    $("#passwordStatus").textContent = "Password updated successfully.";
+  });
 }
 
 window.decideIdentity = (id, status) => {
@@ -464,7 +487,11 @@ function setupAdminMenu() {
     const username = $("#adminUserName").value.trim();
     const rank = $("#adminUserRank").value;
     const password = $("#adminUserPassword").value;
-    if (rank === "Core" && actor.rank !== "Core") return;
+
+    // Admin can only create User accounts directly. Core can create User/Enforcer/Admin.
+    if (actor.rank === "Admin" && rank !== "User") return;
+    if (actor.rank !== "Core" && rank === "Admin") return;
+    if (rank === "Core") return;
 
     const nextId = Math.max(...state.users.map((u) => u.id), 0) + 1;
     state.users.push({ id: nextId, username, rank, password });
@@ -481,6 +508,17 @@ window.adminDeleteUser = (userId) => {
   if (!target || target.rank === "Core" || target.id === actor.id) return;
   if (target.rank === "Admin" && actor.rank !== "Core") return;
   state.users = state.users.filter((u) => u.id !== userId);
+  saveState();
+  renderAll();
+};
+
+
+window.adminPromoteToEnforcer = (userId) => {
+  const actor = guardLoggedIn();
+  if (!actor || !["Admin", "Core"].includes(actor.rank)) return;
+  const target = state.users.find((u) => u.id === userId);
+  if (!target || target.rank !== "User") return;
+  target.rank = "Enforcer";
   saveState();
   renderAll();
 };
@@ -504,10 +542,21 @@ function renderAdminMenu() {
   }
 
   adminTab.classList.remove("hidden");
+
+  const rankSelect = $("#adminUserRank");
+  rankSelect.innerHTML = user.rank === "Core"
+    ? `<option>User</option><option>Enforcer</option><option>Admin</option>`
+    : `<option>User</option>`;
+
   $("#adminUserList").innerHTML = state.users
-    .map(
-      (u) => `<div class="item"><p>${u.username} (#${u.id}) — ${u.rank}</p>${u.rank !== "Core" && u.id !== user.id && (user.rank === "Core" || u.rank !== "Admin") ? `<button onclick="adminDeleteUser(${u.id})">Delete User</button>` : ""}</div>`
-    )
+    .map((u) => {
+      const canDelete = u.rank !== "Core" && u.id !== user.id && (user.rank === "Core" || u.rank !== "Admin");
+      const canPromote = ["Admin", "Core"].includes(user.rank) && u.rank === "User";
+      return `<div class="item"><p>${u.username} (#${u.id}) — ${u.rank}</p>
+        ${canPromote ? `<button onclick="adminPromoteToEnforcer(${u.id})">Promote to Enforcer</button>` : ""}
+        ${canDelete ? `<button onclick="adminDeleteUser(${u.id})">Delete User</button>` : ""}
+      </div>`;
+    })
     .join("");
 
   $("#adminFileList").innerHTML = state.files
